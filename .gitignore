@@ -1,0 +1,11 @@
+# Private data: WiFi password, ntfy topic and device token
+secrets.h
+
+# Editor / agent working files
+.theia/
+.vscode/
+odd/
+
+# OS
+Thumbs.db
+.DS_Store

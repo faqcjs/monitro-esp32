@@ -1,0 +1,248 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0f5c55">
+  <meta name="description" content="Monitor de actividad para personas mayores que viven solas.">
+  <title>Monitor de actividad</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Public+Sans:wght@400;500;600;700&display=swap">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="appbar">
+    <div class="appbar-inner">
+      <div class="brand">
+        <svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true">
+          <rect width="32" height="32" rx="8" fill="currentColor"/>
+          <path d="M6 17h5l2.5-6 4 12 2.5-6H26" fill="none" style="stroke: var(--accent-ink)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <div class="brand-text">
+          <span class="brand-name">Monitor de actividad</span>
+          <span class="brand-sub" id="brand-device"></span>
+        </div>
+      </div>
+      <div class="appbar-actions">
+        <span class="conn" id="conn" hidden><span class="dot"></span><span id="conn-text"></span></span>
+        <button id="logout" class="btn btn-ghost" type="button" hidden>Cerrar sesión</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="page">
+    <!-- ============ Login ============ -->
+    <section id="view-login" class="auth" hidden>
+      <div class="auth-intro">
+        <p class="eyebrow">Cuidado a distancia</p>
+        <h1>Sepa que todo está bien, sin invadir su día.</h1>
+        <p class="lead">El sensor registra la actividad en la casa y le avisa si pasa demasiado tiempo sin movimiento durante el horario que usted defina.</p>
+        <ul class="auth-points">
+          <li>Alerta inmediata en el celular si no hay actividad.</li>
+          <li>Historial por hora para conocer la rutina.</li>
+          <li>Aviso cuando el aparato pierde la conexión.</li>
+        </ul>
+      </div>
+
+      <div class="panel auth-panel">
+        <div class="tabs" role="tablist">
+          <button class="tab is-active" id="tab-login" role="tab" aria-selected="true" type="button">Ingresar</button>
+          <button class="tab" id="tab-signup" role="tab" aria-selected="false" type="button">Crear cuenta</button>
+        </div>
+        <form id="login-form" class="form" novalidate>
+          <div class="field">
+            <label for="login-email">Email</label>
+            <input id="login-email" name="email" type="email" autocomplete="email" required>
+          </div>
+          <div class="field">
+            <label for="login-password">Contraseña</label>
+            <input id="login-password" name="password" type="password" autocomplete="current-password" minlength="6" required>
+            <span class="hint" id="password-hint" hidden>Mínimo 6 caracteres.</span>
+          </div>
+          <button class="btn btn-primary btn-block" id="login-submit" type="submit">Ingresar</button>
+          <p class="notice" id="login-msg" role="status" hidden></p>
+        </form>
+      </div>
+    </section>
+
+    <!-- ============ Device registration ============ -->
+    <section id="view-register" class="narrow" hidden>
+      <div class="section-head">
+        <p class="eyebrow">Primer uso</p>
+        <h1>Registrar el aparato</h1>
+        <p class="lead">Vincule su sensor con esta cuenta. Solo hace falta hacerlo una vez.</p>
+      </div>
+
+      <ol class="steps">
+        <li class="step" id="step-name">
+          <div class="step-head"><span class="step-num">1</span><h2>Ponerle un nombre</h2></div>
+          <form id="register-form" class="form form-inline">
+            <div class="field grow">
+              <label for="device-name">Nombre del aparato</label>
+              <input id="device-name" name="device_name" value="Casa de la abuela" maxlength="40" required>
+            </div>
+            <button class="btn btn-primary" id="register-submit" type="submit">Registrar</button>
+          </form>
+        </li>
+        <li class="step" id="step-token" aria-disabled="true">
+          <div class="step-head"><span class="step-num">2</span><h2>Copiar el token</h2></div>
+          <p class="muted">Se muestra <strong>una sola vez</strong>. Si lo pierde, deberá registrar el aparato de nuevo.</p>
+          <div class="token" id="token-box" hidden>
+            <code id="token"></code>
+            <button class="btn btn-secondary" id="token-copy" type="button">Copiar</button>
+          </div>
+        </li>
+        <li class="step" id="step-flash" aria-disabled="true">
+          <div class="step-head"><span class="step-num">3</span><h2>Cargarlo en el ESP32</h2></div>
+          <p class="muted">Péguelo en <code>DEVICE_TOKEN</code> dentro de <code>secrets.h</code> y vuelva a cargar el programa desde Arduino IDE.</p>
+          <button class="btn btn-primary" id="token-done" type="button" disabled>Ir al panel</button>
+        </li>
+      </ol>
+      <p class="notice" id="register-msg" role="status" hidden></p>
+    </section>
+
+    <!-- ============ Dashboard ============ -->
+    <section id="view-dashboard" class="dashboard" hidden>
+      <section class="status" id="status" data-level="loading" aria-live="polite">
+        <div class="status-main">
+          <span class="pill" id="status-pill"><span class="dot"></span><span id="status-pill-text">Cargando</span></span>
+          <h1 id="status-title">Obteniendo datos…</h1>
+          <p id="status-detail" class="status-detail"></p>
+        </div>
+        <div class="meter" id="meter">
+          <div class="meter-head">
+            <span class="label">Tiempo sin movimiento</span>
+            <span class="meter-value num" id="meter-value">—</span>
+          </div>
+          <div class="meter-track" role="progressbar" aria-labelledby="meter-value" aria-valuemin="0" aria-valuemax="100" id="meter-track">
+            <div class="meter-fill" id="meter-fill"></div>
+          </div>
+          <div class="meter-scale"><span>0</span><span id="meter-max">—</span></div>
+        </div>
+      </section>
+
+      <section class="metrics" aria-label="Resumen">
+        <div class="metric">
+          <span class="label">Movimientos hoy</span>
+          <span class="metric-value num" id="m-today">—</span>
+          <span class="metric-foot" id="m-today-foot">desde las 00:00</span>
+        </div>
+        <div class="metric">
+          <span class="label">Hora de más actividad</span>
+          <span class="metric-value num" id="m-peak">—</span>
+          <span class="metric-foot" id="m-peak-foot">últimas 24 horas</span>
+        </div>
+        <div class="metric">
+          <span class="label">Señal WiFi</span>
+          <span class="metric-value" id="m-signal">—</span>
+          <span class="metric-foot num" id="m-signal-foot"></span>
+        </div>
+        <div class="metric">
+          <span class="label">Último latido</span>
+          <span class="metric-value" id="m-heartbeat">—</span>
+          <span class="metric-foot" id="m-heartbeat-foot">cada 20 s</span>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head">
+          <div>
+            <h2>Actividad por hora</h2>
+            <p class="muted small">Movimientos registrados en las últimas 24 horas.</p>
+          </div>
+          <div class="legend" id="chart-legend">
+            <span><i class="sw sw-in"></i>Horario activo</span>
+            <span><i class="sw sw-out"></i>Fuera de horario</span>
+          </div>
+        </div>
+        <div class="chart-wrap"><canvas id="chart" aria-label="Gráfico de movimientos por hora en las últimas 24 horas" role="img"></canvas></div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head">
+          <div>
+            <h2>Configuración</h2>
+            <p class="muted small">El aparato aplica los cambios en su próximo latido, en unos 20 segundos.</p>
+          </div>
+        </div>
+
+        <form id="settings-form" class="settings" novalidate>
+          <fieldset class="group">
+            <legend>Alerta por inactividad</legend>
+            <p class="group-desc">Se envía una alerta urgente si no se detecta movimiento durante este tiempo.</p>
+            <div class="row">
+              <div class="field">
+                <label for="inactivity-h">Horas</label>
+                <input id="inactivity-h" name="inactivity_h" type="number" min="0" max="168" inputmode="numeric" required>
+              </div>
+              <div class="field">
+                <label for="inactivity-m">Minutos</label>
+                <input id="inactivity-m" name="inactivity_m" type="number" min="0" max="59" inputmode="numeric" required>
+              </div>
+              <div class="field">
+                <label for="repeat-min">Repetir cada (min)</label>
+                <input id="repeat-min" name="repeat_min" type="number" min="1" max="1440" inputmode="numeric" required>
+              </div>
+            </div>
+          </fieldset>
+
+          <fieldset class="group">
+            <legend>Horario activo</legend>
+            <p class="group-desc">Fuera de este horario la alerta queda en pausa, por ejemplo mientras la persona duerme.</p>
+            <label class="switch" for="use-day-window">
+              <input id="use-day-window" name="use_day_window" type="checkbox" role="switch">
+              <span class="switch-ui" aria-hidden="true"></span>
+              <span>Usar horario activo</span>
+            </label>
+            <div class="row" id="window-fields">
+              <div class="field">
+                <label for="day-start">Desde</label>
+                <select id="day-start" name="day_start_h"></select>
+              </div>
+              <div class="field">
+                <label for="day-end">Hasta</label>
+                <select id="day-end" name="day_end_h"></select>
+              </div>
+            </div>
+          </fieldset>
+
+          <fieldset class="group">
+            <legend>Avisos de movimiento</legend>
+            <p class="group-desc">Notificaciones informativas cada vez que se detecta actividad.</p>
+            <label class="switch" for="notify-each">
+              <input id="notify-each" name="notify_each" type="checkbox" role="switch">
+              <span class="switch-ui" aria-hidden="true"></span>
+              <span>Avisar cada movimiento</span>
+            </label>
+            <div class="row" id="gap-fields">
+              <div class="field">
+                <label for="motion-gap">Intervalo mínimo entre avisos (min)</label>
+                <input id="motion-gap" name="motion_gap_min" type="number" min="0" max="1440" inputmode="numeric" required>
+                <span class="hint">0 envía un aviso por cada movimiento.</span>
+              </div>
+            </div>
+          </fieldset>
+
+          <div class="form-bar">
+            <p class="form-state" id="settings-msg" role="status">Sin cambios</p>
+            <div class="form-actions">
+              <button class="btn btn-ghost" id="settings-reset" type="button" disabled>Descartar</button>
+              <button class="btn btn-primary" id="settings-save" type="submit" disabled>Guardar cambios</button>
+            </div>
+          </div>
+        </form>
+      </section>
+
+      <p class="updated muted small num" id="updated"></p>
+    </section>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.110.0/dist/umd/supabase.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script src="config.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
